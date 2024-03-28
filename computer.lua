@@ -1,3 +1,5 @@
+os.loadAPI("json")
+
 local CURRENT_VERSION = "1.6.0"
 
 -- base routes
@@ -10,7 +12,7 @@ local server_version_api_url = base_api_url .. "/version"
 local server_login_url = base_api_url .. "/login"
 local server_register_url = base_api_url .. "/register"
 local server_balance_url = base_api_url .. "/balance"
-local latest_client_raw_api_url = base_api_url .. "/latest-client"
+local latest_client_raw_api_url = "https://raw.githubusercontent.com/tkbstudios/ccbank-client/main/computer.lua"
 local new_transaction_url = base_api_url .. "/transactions/new"
 local transaction_list_url = base_api_url .. "/transactions/list?per_page=16"
 local change_pin_url = base_api_url .. "/change-pin"
