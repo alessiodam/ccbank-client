@@ -1,8 +1,4 @@
-os.pullEvent = os.pullEventRaw -- disables CTRL-T termination
-
-os.loadAPI("json")
-
-local CURRENT_VERSION = "1.5.0"
+local CURRENT_VERSION = "1.6.0"
 
 -- base routes
 local BASE_CCBANK_URL = "https://ccbank.tkbstudios.com"
@@ -13,7 +9,7 @@ local base_api_url = BASE_CCBANK_URL .. "/api/v1"
 local server_version_api_url = base_api_url .. "/version"
 local server_login_url = base_api_url .. "/login"
 local server_balance_url = base_api_url .. "/balance"
-local latest_client_raw_api_url = base_api_url .. "/latest-pocket-client"
+local latest_client_raw_api_url = "https://raw.githubusercontent.com/tkbstudios/ccbank-client/main/pocket.lua"
 local new_transaction_url = base_api_url .. "/transactions/new"
 
 -- Websocket
@@ -53,7 +49,7 @@ local function get_latest_server_version()
         return "Unknown"
     end
 
-    local server_version_json, decode_error = json.decode(server_version_str)
+    local server_version_json, decode_error = textutils.unserializeJSON(server_version_str)
     if not server_version_json then
         write_log("Error decoding server version JSON: " .. (decode_error or "Unknown"))
         return "Unknown"
@@ -75,7 +71,7 @@ local function login(username, pin)
     local postHeaders = {
         ["Content-Type"] = "application/json"
     }
-    local response = http.post(server_login_url, json.encode(postData), postHeaders)
+    local response = http.post(server_login_url, textutils.serializeJSON(postData), postHeaders)
     if not response then
         write_log("Error: Login request failed")
         return {success = false, message = "Failed to connect to server"}
@@ -87,7 +83,7 @@ local function login(username, pin)
         return {success = false, message = "Empty response from server"}
     end
 
-    local decodedResponse, decodeError = json.decode(responseBody)
+    local decodedResponse, decodeError = textutils.unserializeJSON(responseBody)
     if not decodedResponse then
         write_log("Error decoding login response JSON: " .. (decodeError or "Unknown"))
         return {success = false, message = "Failed to parse server response"}
@@ -151,7 +147,7 @@ local function create_transaction(target_username, amount)
         amount = amount
     }
 
-    local response = http.post(new_transaction_url, json.encode(postData), headers)
+    local response = http.post(new_transaction_url, textutils.serializeJSON(postData), headers)
     if not response then
         write_log("Error: Transaction request failed")
         return {success = false, message = "Failed to connect to server"}
@@ -163,7 +159,7 @@ local function create_transaction(target_username, amount)
         return {success = false, message = "Empty response from server"}
     end
 
-    local decodedResponse, decodeError = json.decode(responseBody)
+    local decodedResponse, decodeError = textutils.unserializeJSON(responseBody)
     if not decodedResponse then
         write_log("Error decoding transaction response JSON: " .. (decodeError or "Unknown"))
         return {success = false, message = "Failed to parse server response"}
@@ -296,7 +292,7 @@ local function handle_websocket_transactions()
     write_log(url .. " " .. message)
     if url == transactions_websocket_url then
         write_log("handling ws msg")
-        local transaction_json = json.decode(message)
+        local transaction_json = textutils.unserializeJSON(message)
         local x,y = term.getSize()
         term.setCursorPos(x, y - 3)
         local text = "received " .. tostring(transaction_json.amount) .. " from " .. transaction_json.from_user
