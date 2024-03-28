@@ -1,5 +1,3 @@
-os.loadAPI("json")
-
 local CURRENT_VERSION = "1.6.0"
 
 -- base routes
