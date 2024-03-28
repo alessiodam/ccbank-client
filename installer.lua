@@ -1,5 +1,5 @@
-local latest_client_url = "https://ccbank.tkbstudios.com/api/v1/latest-client"
-local latest_pocket_client_url = "https://ccbank.tkbstudios.com/api/v1/latest-pocket-client"
+local latest_client_url = "https://raw.githubusercontent.com/tkbstudios/ccbank-client/main/computer.lua"
+local latest_pocket_client_url = "https://raw.githubusercontent.com/tkbstudios/ccbank-client/main/pocket.lua"
 
 local function drawButton(x, y, width, text)
     paintutils.drawFilledBox(x, y, x + width - 1, y, colors.blue)
