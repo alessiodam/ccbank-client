@@ -66,11 +66,6 @@ if not term.isColor() then
     os.shutdown()
 end
 
-showMessage(4, "Downloading JSON API from pastebin...")
-shell.run("pastebin get 4nRg9CHU json")
-os.loadAPI("json")
-os.sleep(1)
-
 term.clear()
 term.setCursorPos(1, 1)
 print("Bank Of ComputerCraft Installer")
@@ -81,7 +76,7 @@ if total_downloads_response == nil then
     os.shutdown()
 end
 local total_downloads_content = total_downloads_response.readAll()
-local total_downloads = json.decode(total_downloads_content).count
+local total_downloads = textutils.unserializeJSON(total_downloads_content).count
 term.setCursorPos(1, 10)
 term.write("Total downloads: " .. total_downloads)
 
