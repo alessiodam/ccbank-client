@@ -1,8 +1,4 @@
-os.pullEvent = os.pullEventRaw -- disables CTRL-T termination
-
-os.loadAPI("json")
-
-local CURRENT_VERSION = "1.4.0"
+local CURRENT_VERSION = "1.6.0"
 
 -- base routes
 local BASE_CCBANK_URL = "https://ccbank.tkbstudios.com"
@@ -16,7 +12,7 @@ local server_register_url = base_api_url .. "/register"
 local server_balance_url = base_api_url .. "/balance"
 local latest_client_raw_api_url = base_api_url .. "/latest-client"
 local new_transaction_url = base_api_url .. "/transactions/new"
-local transaction_list_url = base_api_url .. "/transactions/list"
+local transaction_list_url = base_api_url .. "/transactions/list?per_page=16"
 local change_pin_url = base_api_url .. "/change-pin"
 
 -- Websocket
@@ -55,7 +51,7 @@ local function get_latest_server_version()
         return "Unknown"
     end
 
-    local server_version_json, decode_error = json.decode(server_version_str)
+    local server_version_json, decode_error = textutils.unserializeJSON(server_version_str)
     if not server_version_json then
         write_log("Error decoding server version JSON: " .. (decode_error or "Unknown"))
         return "Unknown"
@@ -71,7 +67,7 @@ local function handle_websocket_transactions()
     end
     local _, url, message = os.pullEvent("websocket_message")
     if not message == nil and url == transactions_websocket_url then
-        local transaction_json = json.decode(message)
+        local transaction_json = textutils.unserializeJSON(message)
         local x,y = term.getSize()
         term.setCursorPos(x, y - 2)
         local text = "received " .. tostring(transaction_json.amount) .. " from " .. transaction_json.from_user
@@ -100,10 +96,9 @@ local function login(username, pin)
     local postHeaders = {
         ["Content-Type"] = "application/json"
     }
-    local response = http.post(server_login_url, json.encode(postData), postHeaders)
+    local response, error_msg = http.post(server_login_url, textutils.serializeJSON(postData), postHeaders)
     if not response then
-        write_log("Error: Login request failed")
-        return {success = false, message = "Failed to connect to server"}
+        return {success = false, message = error_msg}
     end
 
     local responseBody = response.readAll()
@@ -112,7 +107,7 @@ local function login(username, pin)
         return {success = false, message = "Empty response from server"}
     end
 
-    local decodedResponse, decodeError = json.decode(responseBody)
+    local decodedResponse, decodeError = textutils.unserializeJSON(responseBody)
     if not decodedResponse then
         write_log("Error decoding login response JSON: " .. (decodeError or "Unknown"))
         return {success = false, message = "Failed to parse server response"}
@@ -148,7 +143,7 @@ local function register(username, pin)
     local postHeaders = {
         ["Content-Type"] = "application/json"
     }
-    local response = http.post(server_register_url, json.encode(postData), postHeaders)
+    local response = http.post(server_register_url, textutils.serializeJSON(postData), postHeaders)
     if not response then
         write_log("Error: Registration request failed")
         return {success = false, message = "Failed to connect to server"}
@@ -160,7 +155,7 @@ local function register(username, pin)
         return {success = false, message = "Empty response from server"}
     end
 
-    local decodedResponse, decodeError = json.decode(responseBody)
+    local decodedResponse, decodeError = textutils.unserializeJSON(responseBody)
     if not decodedResponse then
         write_log("Error decoding registration response JSON: " .. (decodeError or "Unknown"))
         return {success = false, message = "Failed to parse server response"}
@@ -208,7 +203,7 @@ local function create_transaction(session_token, target_username, amount)
         amount = amount
     }
 
-    local response = http.post(new_transaction_url, json.encode(postData), headers)
+    local response = http.post(new_transaction_url, textutils.serializeJSON(postData), headers)
     if not response then
         write_log("Error: Transaction request failed")
         return {success = false, message = "Failed to connect to server"}
@@ -220,7 +215,7 @@ local function create_transaction(session_token, target_username, amount)
         return {success = false, message = "Empty response from server"}
     end
 
-    local decodedResponse, decodeError = json.decode(responseBody)
+    local decodedResponse, decodeError = textutils.unserializeJSON(responseBody)
     if not decodedResponse then
         write_log("Error decoding transaction response JSON: " .. (decodeError or "Unknown"))
         return {success = false, message = "Failed to parse server response"}
@@ -233,12 +228,11 @@ local function get_last_transactions()
     local headers = {
         ["Session-Token"] = sessionToken
     }
-
     local response = http.get(transaction_list_url, headers)
     if response then
         local responseBody = response.readAll()
         response.close()
-        local decodedResponse, decodeError = json.decode(responseBody)
+        local decodedResponse, decodeError = textutils.unserializeJSON(responseBody)
         if decodedResponse then
             return {success = true, transactions = decodedResponse}
         else
@@ -265,7 +259,7 @@ local function change_pin(session_token, new_pin)
         new_pin = new_pin
     }
 
-    local response = http.post(change_pin_url, json.encode(postData), headers)
+    local response = http.post(change_pin_url, textutils.serializeJSON(postData), headers)
     if not response then
         write_log("Error: Change PIN request failed")
         return {success = false, message = "Failed to connect to server"}
@@ -277,7 +271,7 @@ local function change_pin(session_token, new_pin)
         return {success = false, message = "Empty response from server"}
     end
 
-    local decodedResponse, decodeError = json.decode(responseBody)
+    local decodedResponse, decodeError = textutils.unserializeJSON(responseBody)
     if not decodedResponse then
         write_log("Error decoding change PIN response JSON: " .. (decodeError or "Unknown"))
         return {success = false, message = "Failed to parse server response"}
@@ -436,7 +430,7 @@ local function handleMouseClick(x, y)
             print("Transaction failed: " .. transactionResponse.message)
             os.sleep(2)
         end
-    elseif y == 12 then
+    elseif y == 12 and isLoggedIn then
         term.clear()
         term.setCursorPos(1, 1)
         print("Fetching last transactions...")
