@@ -1,8 +1,7 @@
-local CURRENT_VERSION = "1.6.0"
+local CURRENT_VERSION = "1.7.0"
 
 -- base routes
 local BASE_CCBANK_URL = "https://ccbank.tkbstudios.com"
-local BASE_CCBANK_WS_URL = "wss://ccbank.tkbstudios.com"
 
 -- API routes
 local base_api_url = BASE_CCBANK_URL .. "/api/v1"
@@ -11,10 +10,6 @@ local server_login_url = base_api_url .. "/login"
 local server_balance_url = base_api_url .. "/balance"
 local latest_client_raw_api_url = "https://raw.githubusercontent.com/tkbstudios/ccbank-client/main/pocket.lua"
 local new_transaction_url = base_api_url .. "/transactions/new"
-
--- Websocket
-local transactions_websocket_url = BASE_CCBANK_WS_URL .. "/websockets/transactions"
-local transactions_ws
 
 -- some vars
 local latest_server_version = "Unknown"
@@ -71,10 +66,18 @@ local function login(username, pin)
     local postHeaders = {
         ["Content-Type"] = "application/json"
     }
-    local response = http.post(server_login_url, textutils.serializeJSON(postData), postHeaders)
-    if not response then
-        write_log("Error: Login request failed")
-        return {success = false, message = "Failed to connect to server"}
+    local response, error_msg = http.post(server_login_url, textutils.serializeJSON(postData), postHeaders)
+
+    local statusCode = response.getResponseCode()
+    if statusCode >= 400 and statusCode < 500 then
+        local responseBody = response.readAll()
+        if responseBody then
+            local decodedResponse, decodeError = textutils.unserializeJSON(responseBody)
+            if decodedResponse then
+                return {success = false, message = decodedResponse.message}
+            end
+        end
+        return {success = false, message = "HTTP status code: " .. statusCode}
     end
 
     local responseBody = response.readAll()
@@ -93,13 +96,6 @@ local function login(username, pin)
         sessionToken = decodedResponse.session_token
         isLoggedIn = true
         write_log("User '" .. username .. "' logged in successfully")
-        local ws_error_msg
-        transactions_ws, ws_error_msg = http.websocket(transactions_websocket_url, {["Session-Token"] = sessionToken})
-        if not transactions_ws then
-            write_log("Error: Failed to open websocket: " .. (ws_error_msg or "Unknown"))
-        else
-            write_log("Websocket opened successfully")
-        end
     else
         write_log("Login failed for user '" .. username .. "': " .. decodedResponse.message)
     end
@@ -123,6 +119,17 @@ local function get_user_balance()
 
     local response = http.get(server_balance_url, headers)
     if response then
+        local statusCode = response.getResponseCode()
+        if statusCode >= 400 and statusCode < 500 then
+            local responseBody = response.readAll()
+            if responseBody then
+                local decodedResponse, decodeError = textutils.unserializeJSON(responseBody)
+                if decodedResponse then
+                    return decodedResponse.message .. " $OKU"
+                end
+            end
+            return "HTTP " .. statusCode
+        end
         local responseBody = response.readAll()
         response.close()
         return responseBody
@@ -133,7 +140,7 @@ local function get_user_balance()
 end
 
 local function create_transaction(target_username, amount)
-    if string.len(target_username) > 15 or amount <= 0 then
+    if string.len(target_username) > 15 or tonumber(amount) <= 0 then
         return {success = false, message = "Invalid target username or amount"}
     end
 
@@ -149,8 +156,20 @@ local function create_transaction(target_username, amount)
 
     local response = http.post(new_transaction_url, textutils.serializeJSON(postData), headers)
     if not response then
-        write_log("Error: Transaction request failed")
-        return {success = false, message = "Failed to connect to server"}
+        write_log("Error: Failed to create transaction")
+        return {success = false, message = "Failed to create transaction"}
+    end
+
+    local statusCode = response.getResponseCode()
+    if statusCode >= 400 and statusCode < 500 then
+        local responseBody = response.readAll()
+        if responseBody then
+            local decodedResponse, decodeError = textutils.unserializeJSON(responseBody)
+            if decodedResponse then
+                return {success = false, message = decodedResponse.message}
+            end
+        end
+        return {success = false, message = "HTTP status code: " .. statusCode}
     end
 
     local responseBody = response.readAll()
@@ -283,36 +302,6 @@ local function drawUI()
     print("Server: " .. latest_server_version .. "\nClient: " .. CURRENT_VERSION)
 end
 
---[[
-local function handle_websocket_transactions()
-    if not transactions_ws then
-        return
-    end
-    local _, url, message = os.pullEvent("websocket_message")
-    write_log(url .. " " .. message)
-    if url == transactions_websocket_url then
-        write_log("handling ws msg")
-        local transaction_json = textutils.unserializeJSON(message)
-        local x,y = term.getSize()
-        term.setCursorPos(x, y - 3)
-        local text = "received " .. tostring(transaction_json.amount) .. " from " .. transaction_json.from_user
-        user_balance = user_balance + transaction_json.amount
-        write_log(text)
-        term.setCursorPos(math.floor(x - text:len()), y - 3)
-        term.setTextColor(colors.green)
-        term.setBackgroundColor(colors.white)
-        term.write(text)
-        os.sleep(3)
-        term.setTextColor(colors.white)
-        term.setBackgroundColor(colors.blue)
-        local clear_text = string.rep(" ", text:len())
-        term.setCursorPos(math.floor(x - text:len()), y - 3)
-        term.write(clear_text)
-        write_log("done handling websocket transaction")
-    end
-end
---]]
-
 local function handleMouseClick(x, y)
     if y == 3 then
         if isLoggedIn then
@@ -355,7 +344,6 @@ local function main()
     while true do
         drawUI()
         mouseClickStuff()
-        -- find a way to do websocket stuff
     end
 end
 
