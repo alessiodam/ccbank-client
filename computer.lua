@@ -101,6 +101,18 @@ local function login(username, pin)
         return {success = false, message = error_msg}
     end
 
+    local statusCode = response.getResponseCode()
+    if statusCode >= 400 and statusCode < 500 then
+        local responseBody = response.readAll()
+        if responseBody then
+            local decodedResponse, decodeError = textutils.unserializeJSON(responseBody)
+            if decodedResponse then
+                return {success = false, message = decodedResponse.message}
+            end
+        end
+        return {success = false, message = "HTTP status code: " .. statusCode}
+    end
+
     local responseBody = response.readAll()
     if not responseBody then
         write_log("Error: Login response is empty")
@@ -131,6 +143,7 @@ local function login(username, pin)
     return decodedResponse
 end
 
+
 local function register(username, pin)
     if string.len(username) > 15 or string.len(pin) > 8 then
         return {success = false, message = "Invalid username or PIN length"}
@@ -147,6 +160,18 @@ local function register(username, pin)
     if not response then
         write_log("Error: Registration request failed")
         return {success = false, message = "Failed to connect to server"}
+    end
+
+    local statusCode = response.getResponseCode()
+    if statusCode >= 400 and statusCode < 500 then
+        local responseBody = response.readAll()
+        if responseBody then
+            local decodedResponse, decodeError = textutils.unserializeJSON(responseBody)
+            if decodedResponse then
+                return {success = false, message = decodedResponse.message}
+            end
+        end
+        return {success = false, message = "HTTP status code: " .. statusCode}
     end
 
     local responseBody = response.readAll()
@@ -179,6 +204,17 @@ local function get_user_balance(session_token)
 
     local response = http.get(server_balance_url, headers)
     if response then
+        local statusCode = response.getResponseCode()
+        if statusCode >= 400 and statusCode < 500 then
+            local responseBody = response.readAll()
+            if responseBody then
+                local decodedResponse, decodeError = textutils.unserializeJSON(responseBody)
+                if decodedResponse then
+                    return decodedResponse.message
+                end
+            end
+            return "HTTP " .. statusCode
+        end
         local responseBody = response.readAll()
         response.close()
         return responseBody
@@ -209,6 +245,18 @@ local function create_transaction(session_token, target_username, amount)
         return {success = false, message = "Failed to connect to server"}
     end
 
+    local statusCode = response.getResponseCode()
+    if statusCode >= 400 and statusCode < 500 then
+        local responseBody = response.readAll()
+        if responseBody then
+            local decodedResponse, decodeError = textutils.unserializeJSON(responseBody)
+            if decodedResponse then
+                return {success = false, message = decodedResponse.message}
+            end
+        end
+        return {success = false, message = "HTTP status code: " .. statusCode}
+    end
+
     local responseBody = response.readAll()
     if not responseBody then
         write_log("Error: Transaction response is empty")
@@ -230,6 +278,17 @@ local function get_last_transactions()
     }
     local response = http.get(transaction_list_url, headers)
     if response then
+        local statusCode = response.getResponseCode()
+        if statusCode >= 400 and statusCode < 500 then
+            local responseBody = response.readAll()
+            if responseBody then
+                local decodedResponse, decodeError = textutils.unserializeJSON(responseBody)
+                if decodedResponse then
+                    return {success = false, transactions = {}, message = decodedResponse.message}
+                end
+            end
+            return {success = false, transactions = {}, message = "HTTP status code: " .. statusCode}
+        end
         local responseBody = response.readAll()
         response.close()
         local decodedResponse, decodeError = textutils.unserializeJSON(responseBody)
@@ -265,6 +324,18 @@ local function change_pin(session_token, new_pin)
         return {success = false, message = "Failed to connect to server"}
     end
 
+    local statusCode = response.getResponseCode()
+    if statusCode >= 400 and statusCode < 500 then
+        local responseBody = response.readAll()
+        if responseBody then
+            local decodedResponse, decodeError = textutils.unserializeJSON(responseBody)
+            if decodedResponse then
+                return {success = false, message = decodedResponse.message}
+            end
+        end
+        return {success = false, message = "HTTP status code: " .. statusCode}
+    end
+    
     local responseBody = response.readAll()
     if not responseBody then
         write_log("Error: Change PIN response is empty")
