@@ -104,7 +104,6 @@ local function login(username, pin)
 end
 
 local function logout()
-    transactions_ws.close()
     isLoggedIn = false
     username = ""
     user_pin = ""
