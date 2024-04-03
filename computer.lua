@@ -2,7 +2,6 @@ local CURRENT_VERSION = "1.7.0"
 
 -- base routes
 local BASE_CCBANK_URL = "https://ccbank.tkbstudios.com"
-local BASE_CCBANK_WS_URL = "wss://ccbank.tkbstudios.com"
 
 -- API routes
 local base_api_url = BASE_CCBANK_URL .. "/api/v1"
@@ -14,9 +13,6 @@ local new_transaction_url = base_api_url .. "/transactions/new"
 local transaction_list_url = base_api_url .. "/transactions/list?per_page=16"
 local change_pin_url = base_api_url .. "/change-pin"
 
--- Websocket
-local transactions_websocket_url = BASE_CCBANK_WS_URL .. "/websockets/transactions"
-local transactions_ws
 
 -- some vars
 local latest_server_version = "Unknown"
@@ -58,29 +54,6 @@ local function get_latest_server_version()
 
     local server_version = server_version_json.version
     return server_version
-end
-
-local function handle_websocket_transactions()
-    if not transactions_ws then
-        return
-    end
-    local _, url, message = os.pullEvent("websocket_message")
-    if not message == nil and url == transactions_websocket_url then
-        local transaction_json = textutils.unserializeJSON(message)
-        local x,y = term.getSize()
-        term.setCursorPos(x, y - 2)
-        local text = "received " .. tostring(transaction_json.amount) .. " from " .. transaction_json.from_user
-        term.setCursorPos(math.floor(x - text:len()), y - 2)
-        term.setTextColor(colors.green)
-        term.setBackgroundColor(colors.white)
-        term.write(text)
-        os.sleep(3)
-        term.setTextColor(colors.white)
-        term.setBackgroundColor(colors.blue)
-        local clear_text = string.rep(" ", text:len())
-        term.setCursorPos(math.floor(x - text:len()), y - 2)
-        term.write(clear_text)
-    end
 end
 
 local function login(username, pin)
@@ -125,13 +98,6 @@ local function login(username, pin)
         sessionToken = decodedResponse.session_token
         isLoggedIn = true
         write_log("User '" .. username .. "' logged in successfully")
-        local ws_error_msg
-        transactions_ws, ws_error_msg = http.websocket(transactions_websocket_url, {["Session-Token"] = sessionToken})
-        if not transactions_ws then
-            write_log("Error: Failed to open websocket: " .. (ws_error_msg or "Unknown"))
-        else
-            write_log("Websocket opened successfully")
-        end
     else
         write_log("Login failed for user '" .. username .. "': " .. decodedResponse.message)
     end
@@ -144,7 +110,6 @@ local function logout()
     username = ""
     user_balance = "N/A"
     sessionToken = ""
-    transactions_ws.close()
 end
 
 local function get_user_balance(session_token)
