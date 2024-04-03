@@ -1,4 +1,4 @@
-local CURRENT_VERSION = "1.6.0"
+local CURRENT_VERSION = "1.7.0"
 
 -- base routes
 local BASE_CCBANK_URL = "https://ccbank.tkbstudios.com"
@@ -8,7 +8,6 @@ local BASE_CCBANK_WS_URL = "wss://ccbank.tkbstudios.com"
 local base_api_url = BASE_CCBANK_URL .. "/api/v1"
 local server_version_api_url = base_api_url .. "/version"
 local server_login_url = base_api_url .. "/login"
-local server_register_url = base_api_url .. "/register"
 local server_balance_url = base_api_url .. "/balance"
 local latest_client_raw_api_url = "https://raw.githubusercontent.com/tkbstudios/ccbank-client/main/computer.lua"
 local new_transaction_url = base_api_url .. "/transactions/new"
@@ -97,9 +96,6 @@ local function login(username, pin)
         ["Content-Type"] = "application/json"
     }
     local response, error_msg = http.post(server_login_url, textutils.serializeJSON(postData), postHeaders)
-    if not response then
-        return {success = false, message = error_msg}
-    end
 
     local statusCode = response.getResponseCode()
     if statusCode >= 400 and statusCode < 500 then
@@ -138,52 +134,6 @@ local function login(username, pin)
         end
     else
         write_log("Login failed for user '" .. username .. "': " .. decodedResponse.message)
-    end
-
-    return decodedResponse
-end
-
-
-local function register(username, pin)
-    if string.len(username) > 15 or string.len(pin) > 8 then
-        return {success = false, message = "Invalid username or PIN length"}
-    end
-
-    local postData = {
-        username = username,
-        pin = pin
-    }
-    local postHeaders = {
-        ["Content-Type"] = "application/json"
-    }
-    local response = http.post(server_register_url, textutils.serializeJSON(postData), postHeaders)
-    if not response then
-        write_log("Error: Registration request failed")
-        return {success = false, message = "Failed to connect to server"}
-    end
-
-    local statusCode = response.getResponseCode()
-    if statusCode >= 400 and statusCode < 500 then
-        local responseBody = response.readAll()
-        if responseBody then
-            local decodedResponse, decodeError = textutils.unserializeJSON(responseBody)
-            if decodedResponse then
-                return {success = false, message = decodedResponse.message}
-            end
-        end
-        return {success = false, message = "HTTP status code: " .. statusCode}
-    end
-
-    local responseBody = response.readAll()
-    if not responseBody then
-        write_log("Error: Registration response is empty")
-        return {success = false, message = "Empty response from server"}
-    end
-
-    local decodedResponse, decodeError = textutils.unserializeJSON(responseBody)
-    if not decodedResponse then
-        write_log("Error decoding registration response JSON: " .. (decodeError or "Unknown"))
-        return {success = false, message = "Failed to parse server response"}
     end
 
     return decodedResponse
@@ -241,8 +191,8 @@ local function create_transaction(session_token, target_username, amount)
 
     local response = http.post(new_transaction_url, textutils.serializeJSON(postData), headers)
     if not response then
-        write_log("Error: Transaction request failed")
-        return {success = false, message = "Failed to connect to server"}
+        write_log("Error: Failed to create transaction")
+        return {success = false, message = "Failed to create transaction"}
     end
 
     local statusCode = response.getResponseCode()
@@ -320,8 +270,8 @@ local function change_pin(session_token, new_pin)
 
     local response = http.post(change_pin_url, textutils.serializeJSON(postData), headers)
     if not response then
-        write_log("Error: Change PIN request failed")
-        return {success = false, message = "Failed to connect to server"}
+        write_log("Error: Failed to change PIN")
+        return {success = false, message = "Failed to change PIN"}
     end
 
     local statusCode = response.getResponseCode()
@@ -335,7 +285,7 @@ local function change_pin(session_token, new_pin)
         end
         return {success = false, message = "HTTP status code: " .. statusCode}
     end
-    
+
     local responseBody = response.readAll()
     if not responseBody then
         write_log("Error: Change PIN response is empty")
@@ -428,7 +378,9 @@ local function drawUI()
         term.setCursorPos(1, 2)
         print("Login")
         term.setCursorPos(1, 5)
-        print("Register")
+        print("Register on website")
+        term.setCursorPos(1, 6)
+        print("ccbank.tkbstudios.com")
     end
 
     term.setCursorPos(1, 18)
@@ -460,28 +412,6 @@ local function handleMouseClick(x, y)
                 os.sleep(2)
             end
 
-        end
-    elseif y == 5 and not isLoggedIn then
-        term.clear()
-        term.setCursorPos(1, 1)
-        term.setTextColor(colors.yellow)
-        write("Enter username: ")
-        local reg_username = read()
-        term.setTextColor(colors.yellow)
-        write("Enter PIN: ")
-        local reg_pin = read("*")
-        if reg_pin:match("^%d+$") then
-            local regResponse = register(reg_username, reg_pin)
-            if regResponse.success then
-                print("Registration successful! Please login.")
-                os.sleep(2)
-            else
-                print("Registration failed: " .. regResponse.message)
-                os.sleep(2)
-            end
-        else
-            print("PIN must contain only numbers.")
-            os.sleep(2)
         end
     elseif isLoggedIn and y == 10 then
         term.clear()
@@ -563,7 +493,7 @@ local function handleMouseClick(x, y)
         else
             print("Failed to change PIN: " .. pinChangeResponse.message)
         end
-        os.sleep(2)
+        os.sleep(1)
     end
 end
 
@@ -590,7 +520,8 @@ local function main()
             end
             lastUpdateCheck = os.time()
         else
-            parallel.waitForAll(handle_websocket_transactions, drawUI, mouseClickStuff)
+            drawUI()
+            mouseClickStuff()
         end
     end
 end
