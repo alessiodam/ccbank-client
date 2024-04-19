@@ -1,4 +1,4 @@
-local CURRENT_VERSION = "1.7.0"
+local CURRENT_VERSION = "1.8.0"
 
 -- base routes
 local BASE_CCBANK_URL = "https://ccbank.tkbstudios.com"
